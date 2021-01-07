@@ -1,0 +1,4 @@
+#!/usr/bin/with-contenv sh
+
+cd /app
+pipenv run python /app/bot.py

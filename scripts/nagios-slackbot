@@ -1,0 +1,153 @@
+#!/usr/bin/python
+import paho.mqtt.client as mqtt
+import json
+import time
+import re
+from datetime import timedelta, datetime
+import socket
+
+cmd_file = '/var/lib/nagios3/rw/nagios.cmd'
+objects_file = '/var/cache/nagios3/objects.cache'
+status_file = '/var/cache/nagios3/status.dat'
+
+UDP_IP = '31.3.8.56'
+UDP_PORT = 47777
+UDP_PASS = ''
+
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+DEFAULT_EMOJI = ':grey_question:'
+
+EMOJI_MAP = {
+    '0': ':white_check_mark:',
+    '1': ':warning:',
+    '2': ':exclamation:',
+    '3': ':grey_question:'
+}
+
+def parseConf(source):
+    conf = {}
+    patID=re.compile(r"(?:\s*define)?\s*(\w+)\s+{")
+    patAttr=re.compile(r"\s*(\w+)(?:=|\s+)(.*)")
+    patEndID=re.compile(r"\s*}")
+    for line in source.splitlines():
+        line=line.strip()
+        matchID = patID.match(line)
+        matchAttr = patAttr.match(line)
+        matchEndID = patEndID.match( line)
+        if len(line) == 0 or line[0]=='#':
+            pass
+        elif matchID:
+            identifier = matchID.group(1)
+            cur = [identifier, {}]
+        elif matchAttr:
+            attribute = matchAttr.group(1)
+            value = matchAttr.group(2).strip()
+            cur[1][attribute] = value
+        elif matchEndID and cur:
+            conf.setdefault(cur[0],[]).append(cur[1])
+            del cur
+    return conf
+
+def find_hosts(match):
+    conf = parseConf(open(objects_file, 'r').read())
+    prog = re.compile('^%s$' % (match))
+    hosts = []
+    for host in conf['host']:
+        if not prog.search(host['host_name']):
+            continue
+        hosts.append(host)
+    return hosts
+
+def find_services(match_host, match_service):
+    conf = parseConf(open(objects_file, 'r').read())
+    prog_host = re.compile('^%s$' % (match_host))
+    prog_service = re.compile('^%s$' % (match_service))
+    services = []
+    for service in conf['service']:
+        if not prog_host.search(service['host_name']):
+            continue
+        if not prog_service.search(service['service_description']):
+            continue
+        services.append(service)
+    return services
+
+def write_cmd(line):
+    with open(cmd_file, 'a') as cmd:
+        msg = '[%s] %s\n' % (int(time.time()), line)
+        cmd.write(msg)
+    cmd.close()
+
+def send_msg(channel, msg):
+    print(msg)
+    sock.sendto('%s %s %s' % (UDP_PASS, channel, msg), (UDP_IP, UDP_PORT))
+
+def parse_time(s):
+    seconds_per_unit = {"s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800}
+    return int(s[:-1]) * seconds_per_unit[s[-1]]
+
+################################
+
+def handle_status(payload):
+    status = parseConf(open(status_file, 'r').read())
+    prog_host = re.compile('^%s$' % (payload['match']))
+    hosts = {}
+    for service in status['servicestatus']:
+        if not prog_host.search(service['host_name']):
+            continue
+        if service['host_name'] not in hosts:
+            hosts[service['host_name']] = []
+        hosts[service['host_name']].append(service)
+    for host in hosts:
+        host_svc = []
+        services = hosts[host]
+        has_issue = False
+        for service in services:
+            emoji = EMOJI_MAP.get(service['current_state'], DEFAULT_EMOJI)
+            if payload['do_details']:
+                if service['current_state'] != '0':
+                    svc = '%s %s: %s' % (emoji, service['service_description'], service['plugin_output'])
+                else: continue
+            else:
+                svc = '%s %s' % (emoji, service['service_description'])
+            if service['current_state'] != '0':
+                has_issue = True
+                host_svc.insert(0, svc)
+            else:
+                    host_svc.append(svc)
+        if has_issue or payload['do_all']:
+            if payload['do_details']:
+                for service in host_svc:
+                    send_msg(payload['channel'], '[%s] %s' % (host, service))
+            else:
+                send_msg(payload['channel'], '[%s] %s' % (host, " .. ".join(host_svc)))
+
+################################
+
+commands = {
+    'status': handle_status,
+}
+
+def on_message(client, userdata, msg):
+    try:
+        command = msg.topic.split('/', 2)[2]
+        payload = json.loads(msg.payload)
+        try:
+            commands[command](payload)
+        except Exception, e:
+            print(e)
+            if 'channel' in payload:
+            send_msg(payload['channel'], 'nagios failed: %s' % (e))
+    except:
+        pass
+
+def on_connect(client, userdata, flags, rc):
+    print('Connected with code: %s' % (rc))
+    client.subscribe('slack/nagios/#')
+
+client = mqtt.Client()
+client.on_connect = on_connect
+client.on_message = on_message
+
+client.connect('31.3.8.56', 1883, 60)
+client.loop_forever()
