@@ -1,4 +1,5 @@
 import json
+import threading
 
 class SlackEventManager():
     def __init__(self, bot):
@@ -26,10 +27,11 @@ class SlackEventManager():
     def event_callback(self, request):
         self.bot.log.info("received '%s' event" % request.data['event']['type'])
         data = request.data['event']
-        if data['type'] == 'message' and data['user'] != self.bot.state['bot_user']:
+        if data['type'] == 'message' and 'user' in data and data['user'] != self.bot.state['bot_user']:
             if data['text'][0:len(self.bot.state['bot_prefix'])] == self.bot.state['bot_prefix']:
                 message = SlackMessage(self.bot, data)
-                self.bot.plugins.handle_command(message)
+                thr = threading.Thread(target=self.bot.plugins.handle_command, args=(message,))
+                thr.start()
         return data
 
 class SlackMessage():
