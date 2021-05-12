@@ -10,7 +10,7 @@ cmd_file = '/var/lib/nagios3/rw/nagios.cmd'
 objects_file = '/var/cache/nagios3/objects.cache'
 status_file = '/var/cache/nagios3/status.dat'
 
-UDP_IP = '31.3.8.56'
+UDP_IP = ''
 UDP_PORT = 47777
 UDP_PASS = ''
 
@@ -149,5 +149,5 @@ client = mqtt.Client()
 client.on_connect = on_connect
 client.on_message = on_message
 
-client.connect('31.3.8.56', 1883, 60)
+client.connect('', 1883, 60)
 client.loop_forever()
