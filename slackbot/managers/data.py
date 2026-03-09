@@ -2,12 +2,12 @@ import os
 import json
 
 class DataManager:
-    def __init__(self, bot, file, default={}):
+    def __init__(self, bot, file, default=None):
         self.bot = bot
         self.file_name = file
         self.bot.log.info("setting up datamanager for '%s'" % self.file_name)
         self.file = os.path.join(self.bot.state_file_base, '%s.json' % self.file_name)
-        self.data = default
+        self.data = default or {}
 
         self.bot.log.info("loading data file '%s'" % self.file_name)
         if os.path.isfile(self.file):

@@ -88,10 +88,10 @@ class PluginManager:
             for ptopic in plugin['mqtt']:
                 if not topic.startswith(ptopic):
                     continue
-            self.bot.log.info("using plugin '%s' to handle '%s' topic" % (name, topic))
-            try:
-                plugin['object'].mqtt(self.bot, topic, payload)
-            except Exception as e:
-                self.bot.log.error("error from plugin '%s'" % name)
-                self.bot.log.error(e)
-                return False
+                self.bot.log.info("using plugin '%s' to handle '%s' topic" % (name, topic))
+                try:
+                    plugin['object'].mqtt(self.bot, topic, payload)
+                except Exception as e:
+                    self.bot.log.error("error from plugin '%s'" % name)
+                    self.bot.log.error(e)
+                    return False

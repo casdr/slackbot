@@ -82,7 +82,7 @@ class SlackBot():
     
     def mqtt_event(self, client, userdata, msg):
         topic = msg.topic
-        payload = msg.topic
+        payload = msg.payload
 
         try:
             payload = json.loads(payload)
