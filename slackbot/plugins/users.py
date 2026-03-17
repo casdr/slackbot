@@ -43,4 +43,4 @@ def run(bot, event):
         if not event.user.is_registered:
             return event.reply(text="I don't know you :(")
         else:
-            return event.reply(text="id: %s, perms: %s" % (event.user.id, ",".join(event.user.perms)))
+            return event.reply(text=f"id: {event.user.id}, perms: {','.join(event.user.perms)}")

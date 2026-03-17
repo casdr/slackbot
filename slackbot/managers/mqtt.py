@@ -33,6 +33,6 @@ class MqttManager:
     def publish(self, topic, payload):
         try:
             payload = json.dumps(payload)
-        except:
+        except (TypeError, ValueError):
             pass
         return self.client.publish(topic, payload)

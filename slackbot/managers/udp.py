@@ -23,6 +23,7 @@ class UdpManager:
         self.udp_open = True
 
         self.udp_thread = UdpThread(self.bot, self.udp_socket, self.event_handler)
+        self.udp_thread.daemon = True
         self.udp_thread.start()
 
 class UdpThread(threading.Thread):
@@ -32,15 +33,17 @@ class UdpThread(threading.Thread):
         self.socket = sock
         self.killed = False
         self.event_handler = event_handler
-    
+
     def run(self):
         self.bot.log.info('starting udp loop')
         while not self.killed:
             try:
                 data, addr = self.socket.recvfrom(1024)
                 self.event_handler(data.decode('utf-8').rstrip('\n'))
-            except:
-                pass
+            except OSError:
+                break
+            except Exception as e:
+                self.bot.log.error(f"udp error: {e}")
         self.bot.log.info('udp loop killed')
     
     def kill(self):

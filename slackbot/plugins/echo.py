@@ -7,7 +7,10 @@ def config(bot):
     }
 
 def run(bot, event):
-    event.reply(text="%s" % event.rest)
+    event.reply(text=event.rest)
 
 def mqtt(bot, topic, payload):
-    bot.slack.chat_postMessage(payload)
+    if isinstance(payload, dict):
+        bot.slack.chat_postMessage(**payload)
+    else:
+        bot.slack.chat_postMessage(channel='#general', text=str(payload))
